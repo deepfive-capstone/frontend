@@ -2,112 +2,128 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../services/api_service.dart';
- 
-// ── 카드 타입 ────────────────────────────────────────────────
-enum CardType { liked, skipped, recent }
- 
+import '../services/card_store.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 // ── 저장된 카드 모델 ─────────────────────────────────────────
+// CardStore의 SwipeState를 그대로 사용
 class SavedCard {
   final String id;
   final String channelName;
   final String title;
   final String thumbnailUrl;
   final String category;
-  CardType type;
- 
+  final String summary;
+  SwipeState state;
+
   SavedCard({
     required this.id,
     required this.channelName,
     required this.title,
     required this.thumbnailUrl,
     required this.category,
-    required this.type,
+    required this.summary,
+    required this.state,
   });
- 
-  factory SavedCard.fromVideoCardData(VideoCardData data) {
+
+  factory SavedCard.fromStoredCard(StoredCard stored) {
     return SavedCard(
-      id: data.videoId,
-      channelName: data.channelName,
-      title: data.title,
-      thumbnailUrl: data.thumbnailUrl,
-      category: data.category,
-      type: CardType.recent,
+      id: stored.data.videoId,
+      channelName: stored.data.channelName,
+      title: stored.data.title,
+      thumbnailUrl: stored.data.thumbnailUrl,
+      category: stored.data.category,
+      summary: stored.data.summary,
+      state: stored.state,
     );
   }
 }
- 
+
 // ── 카테고리 모델 ────────────────────────────────────────────
 class StorageCategory {
   final String name;
   final Color color;
   const StorageCategory({required this.name, required this.color});
 }
- 
+
 class StorageScreen extends StatefulWidget {
   const StorageScreen({super.key});
- 
+
   @override
   State<StorageScreen> createState() => _StorageScreenState();
 }
- 
+
 class _StorageScreenState extends State<StorageScreen> {
- 
   bool _isLoadingData = false;
- 
+
   Future<void> loadData() async {
-    setState(() => _isLoadingData = true);
-    try {
-      final videos = await ApiService.getVideos();
-      setState(() {
-        _allCards = videos.map((v) => SavedCard.fromVideoCardData(v)).toList();
-        _isLoadingData = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingData = false);
-      debugPrint('에러: $e');
-    }
+    setState(() {
+      _allCards = CardStore.instance.cards
+          .map((s) => SavedCard.fromStoredCard(s))
+          .toList();
+    });
   }
- 
+
   final TextEditingController _searchCtrl = TextEditingController();
- 
+
   // 선택된 카테고리 (다중선택, 빈 set = 전체)
   final Set<String> _selectedCategories = {};
- 
+
   // 선택된 타입 (단일 선택, null = 전체)
-  CardType? _selectedType;
- 
+  SwipeState? _selectedState;
+
   // 체크박스 선택 모드
   bool _isSelectMode = false;
   final Set<String> _checkedIds = {};
- 
-  // 카테고리 목록 (백엔드 classifier 기준 7개)
+
+  // 카테고리 목록
   final List<StorageCategory> _categories = const [
-    StorageCategory(name: '자기계발', color: Color(0xFFD9C9C5)),
-    StorageCategory(name: '운동',    color: Color(0xFFCBB5B0)),
-    StorageCategory(name: '요리',    color: Color(0xFFB89E9A)),
-    StorageCategory(name: '여행',    color: Color(0xFF9E7F7A)),
-    StorageCategory(name: '뉴스',    color: Color(0xFF8A6E69)),
-    StorageCategory(name: '콘텐츠',  color: Color(0xFF755D59)),
-    StorageCategory(name: '기타',    color: Color(0xFF5E4A46)),
+    StorageCategory(name: '자기계발', color: Color.fromARGB(255, 255, 237, 156)),
+    StorageCategory(name: '운동', color: Color.fromARGB(255, 188, 228, 160)),
+    StorageCategory(name: '요리', color: Color.fromARGB(255, 222, 169, 159)),
+    StorageCategory(name: '여행', color: Color.fromARGB(255, 139, 188, 199)),
+    StorageCategory(name: '뉴스', color: Color.fromARGB(255, 181, 181, 181)),
+    StorageCategory(name: '콘텐츠', color: Color.fromARGB(255, 196, 158, 219)),
+    StorageCategory(name: '기타', color: Color.fromARGB(255, 232, 187, 141)),
   ];
- 
+
+  IconData _categoryIcon(String category) {
+    switch (category) {
+      case '자기계발':
+        return Icons.auto_awesome;
+      case '운동':
+        return Icons.fitness_center;
+      case '요리':
+        return Icons.restaurant;
+      case '여행':
+        return Icons.flight;
+      case '뉴스':
+        return Icons.newspaper;
+      case '콘텐츠':
+        return Icons.movie;
+      default:
+        return Icons.category;
+    }
+  }
+
   List<SavedCard> _allCards = [];
- 
+
   // ── 필터 로직 ─────────────────────────────────────────────
   List<SavedCard> get _filteredCards {
     final query = _searchCtrl.text.trim().toLowerCase();
     return _allCards.where((card) {
       final catMatch = _selectedCategories.isEmpty ||
           _selectedCategories.contains(card.category);
-      final typeMatch =
-          _selectedType == null || card.type == _selectedType;
+      final stateMatch =
+          _selectedState == null || card.state == _selectedState;
       final searchMatch = query.isEmpty ||
           card.title.toLowerCase().contains(query) ||
           card.channelName.toLowerCase().contains(query);
-      return catMatch && typeMatch && searchMatch;
+      return catMatch && stateMatch && searchMatch;
     }).toList();
   }
- 
+
   void _toggleCategory(String name) {
     setState(() {
       if (_selectedCategories.contains(name)) {
@@ -117,22 +133,23 @@ class _StorageScreenState extends State<StorageScreen> {
       }
     });
   }
- 
-  void _toggleType(CardType type) {
+
+  void _toggleState(SwipeState state) {
     setState(() {
-      _selectedType = _selectedType == type ? null : type;
-      _isSelectMode = _selectedType == CardType.skipped;
+      _selectedState = _selectedState == state ? null : state;
+      // skipped 필터 선택 시 선택 모드 자동 진입
+      _isSelectMode = _selectedState == SwipeState.skipped;
       _checkedIds.clear();
     });
   }
- 
+
   void _toggleSelectMode() {
     setState(() {
       _isSelectMode = !_isSelectMode;
       _checkedIds.clear();
     });
   }
- 
+
   void _toggleCheck(String id) {
     setState(() {
       if (_checkedIds.contains(id)) {
@@ -142,58 +159,87 @@ class _StorageScreenState extends State<StorageScreen> {
       }
     });
   }
- 
+
   void _selectAll() {
     setState(() {
       final allIds = _filteredCards.map((c) => c.id).toSet();
       if (_checkedIds.containsAll(allIds) && allIds.isNotEmpty) {
         _checkedIds.clear();
       } else {
-        _checkedIds..clear()..addAll(allIds);
+        _checkedIds
+          ..clear()
+          ..addAll(allIds);
       }
     });
   }
- 
-  void _deleteChecked() {
+
+Future<void> _deleteChecked() async {
+  try {
+    final cardsToDelete = CardStore.instance.cards
+        .where((c) => _checkedIds.contains(c.data.videoId))
+        .toList();
+
+    for (final card in cardsToDelete) {
+      await ApiService.deleteContent(
+        card.data.contentId,
+      );
+
+      CardStore.instance.remove(
+        card.data.videoId,
+      );
+    }
+
     setState(() {
-      _allCards.removeWhere((c) => _checkedIds.contains(c.id));
+      _allCards.removeWhere(
+        (c) => _checkedIds.contains(c.id),
+      );
+
       _checkedIds.clear();
       _isSelectMode = false;
     });
+  } catch (e) {
+    debugPrint('DELETE 실패: $e');
   }
- 
+}
+
   void _restoreChecked() {
     setState(() {
+      for (final id in _checkedIds) {
+        CardStore.instance.updateState(id, SwipeState.none);
+      }
       for (final card in _allCards) {
         if (_checkedIds.contains(card.id)) {
-          card.type = CardType.recent;
+          card.state = SwipeState.none;
         }
       }
       _checkedIds.clear();
       _isSelectMode = false;
     });
   }
- 
-  Color _typeActiveColor(CardType type) {
-    switch (type) {
-      case CardType.liked:   return const Color(0xFFC794A1);
-      case CardType.skipped: return const Color(0xFF3C4F79);
-      case CardType.recent:  return const Color(0xFF1A1A1A);
+
+  Color _stateActiveColor(SwipeState state) {
+    switch (state) {
+      case SwipeState.liked:
+        return const Color(0xFFC794A1);
+      case SwipeState.skipped:
+        return const Color(0xFF6B95A7);
+      case SwipeState.none:
+        return const Color(0xFF1A1A1A);
     }
   }
- 
+
   @override
   void initState() {
     super.initState();
     loadData();
   }
- 
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -229,7 +275,7 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
   // ── 검색창 ────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Padding(
@@ -238,7 +284,7 @@ class _StorageScreenState extends State<StorageScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(13),
         ),
         child: Row(
           children: [
@@ -267,7 +313,7 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
   // ── 카테고리 헤더 (타이틀 + 타입 필터 버튼) ───────────────
   Widget _buildCategoryHeader() {
     return Padding(
@@ -277,44 +323,43 @@ class _StorageScreenState extends State<StorageScreen> {
           const Text(
             'Category',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
               color: Color(0xFF1A1A1A),
             ),
           ),
           const Spacer(),
-          _typeBtn(CardType.liked,
-              active: Icons.favorite_border_rounded,
-              inactive: Icons.favorite_border_rounded),
+          _stateBtn(SwipeState.liked,
+              activeIcon: Icons.favorite_border,
+              inactiveIcon: Icons.favorite_border_rounded),
           const SizedBox(width: 12),
-          _typeBtn(CardType.skipped,
-              active: Icons.close_rounded,
-              inactive: Icons.close_rounded),
+          _stateBtn(SwipeState.skipped,
+              activeIcon: Icons.close_rounded,
+              inactiveIcon: Icons.close_rounded),
           const SizedBox(width: 12),
-          _typeBtn(CardType.recent,
-              active: Icons.access_time_rounded,
-              inactive: Icons.access_time_outlined),
- 
+          _stateBtn(SwipeState.none,
+              activeIcon: Icons.radio_button_unchecked,
+              inactiveIcon: Icons.radio_button_unchecked),
         ],
       ),
     );
   }
- 
-  Widget _typeBtn(CardType type,
-      {required IconData active, required IconData inactive}) {
-    final isSelected = _selectedType == type;
+
+  Widget _stateBtn(SwipeState state,
+      {required IconData activeIcon, required IconData inactiveIcon}) {
+    final isSelected = _selectedState == state;
     return GestureDetector(
-      onTap: () => _toggleType(type),
+      onTap: () => _toggleState(state),
       child: Icon(
-        isSelected ? active : inactive,
+        isSelected ? activeIcon : inactiveIcon,
         size: 22,
         color: isSelected
-            ? _typeActiveColor(type)
+            ? _stateActiveColor(state)
             : const Color(0xFFAAAAAA),
       ),
     );
   }
- 
+
   // ── 카테고리 원형 가로 스크롤 ─────────────────────────────
   Widget _buildCategoryScroll() {
     return SizedBox(
@@ -346,18 +391,20 @@ class _StorageScreenState extends State<StorageScreen> {
                       children: [
                         Opacity(
                           opacity: isSelected ? 1.0 : 0.35,
-                          child: Container(
-                            width: 62,
-                            height: 62,
-                            decoration: BoxDecoration(
-                              color: cat.color,
-                              shape: BoxShape.circle,
+                            child: Container(
+                              width: 62,
+                              height: 62,
+                              decoration: BoxDecoration(
+                                color: cat.color,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _categoryIcon(cat.name),
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                           ),
-                        ),
-                        if (isSelected)
-                          const Icon(Icons.check_rounded,
-                              size: 22, color: Colors.white),
                       ],
                     ),
                     const SizedBox(height: 5),
@@ -382,7 +429,7 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
   Widget _buildSelectToolbar() {
     final hasChecked = _checkedIds.isNotEmpty;
     final allSelected =
@@ -408,7 +455,7 @@ class _StorageScreenState extends State<StorageScreen> {
             icon: Icons.delete_outline_rounded,
             onTap: hasChecked ? _deleteChecked : null,
             color: hasChecked
-                ? const Color(0xFF3C4F79)
+                ? const Color.fromARGB(255, 99, 99, 99)
                 : const Color(0xFFCCCCCC),
           ),
           const SizedBox(width: 16),
@@ -417,7 +464,7 @@ class _StorageScreenState extends State<StorageScreen> {
             icon: Icons.refresh_rounded,
             onTap: hasChecked ? _restoreChecked : null,
             color: hasChecked
-                ? const Color(0xFFC794A1)
+                ? const Color.fromARGB(255, 129, 129, 129)
                 : const Color(0xFFCCCCCC),
           ),
           if (hasChecked) ...[
@@ -430,7 +477,7 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
   Widget _toolbarBtn({
     required String label,
     required IconData icon,
@@ -453,7 +500,7 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
   // ── 2열 카드 그리드 ───────────────────────────────────────
   Widget _buildCardGrid() {
     final cards = _filteredCards;
@@ -476,23 +523,25 @@ class _StorageScreenState extends State<StorageScreen> {
       onRefresh: loadData,
       color: const Color(0xFF1A1A1A),
       child: GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: cards.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 14,
-        childAspectRatio: 1.2,
-      ),
-      itemBuilder: (context, i) => _buildGridCard(cards[i]),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: cards.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 14,
+          childAspectRatio: 1.2,
+        ),
+        itemBuilder: (context, i) => _buildGridCard(cards[i]),
       ),
     );
   }
- 
+
   Widget _buildGridCard(SavedCard card) {
     final isChecked = _checkedIds.contains(card.id);
     return GestureDetector(
-      onTap: _isSelectMode ? () => _toggleCheck(card.id) : null,
+      onTap: _isSelectMode
+          ? () => _toggleCheck(card.id)
+          : () => _showCardDetail(card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -505,6 +554,12 @@ class _StorageScreenState extends State<StorageScreen> {
                       ? Image.network(card.thumbnailUrl,
                           width: double.infinity, fit: BoxFit.cover)
                       : _thumbPlaceholder(card.category),
+                ),
+                // 스와이프 상태 뱃지
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: _stateBadge(card.state),
                 ),
                 if (_isSelectMode)
                   Positioned(
@@ -543,6 +598,8 @@ class _StorageScreenState extends State<StorageScreen> {
           const SizedBox(height: 6),
           Text(
             card.channelName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 11,
               color: Color(0xFF888888),
@@ -564,16 +621,158 @@ class _StorageScreenState extends State<StorageScreen> {
       ),
     );
   }
- 
+
+  // ── 카드 상세 팝업 ────────────────────────────────────────
+  void _showCardDetail(SavedCard card) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, controller) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDDDDD),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    // 채널명
+                    Text(card.channelName,
+                      style: const TextStyle(
+                        fontSize: 13, color: Color(0xFF888888),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF888888),
+                      )),
+                    const SizedBox(height: 12),
+                    // 썸네일
+                    if (card.thumbnailUrl.isNotEmpty)
+                      GestureDetector(
+                        onTap: () async {
+                          final uri = Uri.parse(
+                            'https://www.youtube.com/watch?v=${card.id}',
+                          );
+
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: Image.network(
+                              card.thumbnailUrl,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    // 카테고리 뱃지
+                    Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F0F0),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        card.category,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                    ),
+                  ),
+                    const SizedBox(height: 10),
+                    // 제목
+                    Text(card.title,
+                      style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A), height: 1.3,
+                      )),
+                    const SizedBox(height: 12),
+                    // 요약
+                    MarkdownBody(
+                      data: card.summary,
+                        styleSheet: MarkdownStyleSheet(
+                          p: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1A1A1A),
+                            height: 1.6,
+                          ),
+                          h2: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      )
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── 카드 상태 뱃지 ────────────────────────────────────────
+  Widget _stateBadge(SwipeState state) {
+    if (state == SwipeState.none) return const SizedBox.shrink();
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        state == SwipeState.liked
+            ? Icons.favorite_border
+            : Icons.close_rounded,
+        size: 13,
+        color: state == SwipeState.liked
+            ? const Color(0xFFC794A1)
+            : const Color(0xFF6B95A7),
+      ),
+    );
+  }
+
   Widget _thumbPlaceholder(String category) {
     final colorMap = {
-      '자기계발': const Color(0xFFD9C9C5),
-      '운동':    const Color(0xFFCBB5B0),
-      '요리':    const Color(0xFFB89E9A),
-      '여행':    const Color(0xFF9E7F7A),
-      '뉴스':    const Color(0xFF8A6E69),
-      '콘텐츠':  const Color(0xFF755D59),
-      '기타':    const Color(0xFF5E4A46),
+      '자기계발': const Color(0xFF8E8E8E),
+      '운동': const Color(0xFF8E8E8E),
+      '요리': const Color(0xFF8E8E8E),
+      '여행': const Color(0xFF8E8E8E),
+      '뉴스': const Color(0xFF8E8E8E),
+      '콘텐츠': const Color(0xFF8E8E8E),
+      '기타': const Color(0xFF8E8E8E),
     };
     return Container(
       width: double.infinity,

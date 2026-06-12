@@ -4,6 +4,7 @@ import 'screens/main_screen.dart';
 import 'screens/link_screen.dart';
 import 'screens/storage_screen.dart';
 import 'screens/mypage_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() {
   runApp(const SwipeApp());
@@ -33,17 +34,17 @@ class SwipeApp extends StatelessWidget {
 
         pageTransitionsTheme:
             const PageTransitionsTheme(
-         builders: {
+         builders: <TargetPlatform, PageTransitionsBuilder>{
             TargetPlatform.android:
-                CupertinoPageTransitionsBuilder(),
+                const ZoomPageTransitionsBuilder(),
             TargetPlatform.iOS:
-                CupertinoPageTransitionsBuilder(),
+                const ZoomPageTransitionsBuilder(),
             TargetPlatform.windows:
-                CupertinoPageTransitionsBuilder(),
+                const ZoomPageTransitionsBuilder(),
           },
         ),
       ),
-      home: const AppShell(),
+      home: const LoginScreen(),
     );
   }
 }

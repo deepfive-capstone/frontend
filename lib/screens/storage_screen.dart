@@ -551,8 +551,12 @@ Future<void> _deleteChecked() async {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: card.thumbnailUrl.isNotEmpty
-                      ? Image.network(card.thumbnailUrl,
-                          width: double.infinity, fit: BoxFit.cover)
+                      ? Image.network(
+                          '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(card.thumbnailUrl)}',
+                          width: double.infinity, 
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _thumbPlaceholder(card.category),
+                        )
                       : _thumbPlaceholder(card.category),
                 ),
                 // 스와이프 상태 뱃지
@@ -679,8 +683,9 @@ Future<void> _deleteChecked() async {
                           child: AspectRatio(
                             aspectRatio: 16 / 9,
                             child: Image.network(
-                              card.thumbnailUrl,
+                              '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(card.thumbnailUrl)}',
                               fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _thumbPlaceholder(card.category),
                             ),
                           ),
                         ),

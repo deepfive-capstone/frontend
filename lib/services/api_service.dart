@@ -32,7 +32,7 @@ class VideoCardData {
       channelName:  json['channel'] ?? '',
       title:        json['title'] ?? '',
       summary:      json['summary'] ?? '',
-      thumbnailUrl: json['thumbnail_url'] ?? '',
+      thumbnailUrl: json['thumbnail'] ?? json['thumbnail_url'] ?? '',
       category:     json['category'] ?? '기타',
       status:       json['status'] ?? 'analyze',
     );
@@ -61,7 +61,7 @@ class RecommendationData {
       videoId: json['video_id'] ?? '',
       title: json['title'] ?? '',
       channel: json['channel'] ?? '',
-      thumbnailUrl: json['thumbnail_url'] ?? '',
+      thumbnailUrl: json['thumbnail'] ?? json['thumbnail_url'] ?? '',
       youtubeUrl: json['youtube_url'] ?? '',
     );
   }
@@ -213,14 +213,14 @@ static Future<List<RecommendationData>>
     '추천 조회 실패: ${res.statusCode} ${res.body}',
   );
 }
-static Future<Map<String, dynamic>> loginWithGoogle() async {
+static Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
   final res = await http.post(
     Uri.parse('$baseUrl/user/login/google'),
     headers: {
       'Content-Type': 'application/json',
     },
     body: jsonEncode({
-      'id_token': 'test',
+      'id_token': idToken,
     }),
   );
 
@@ -229,7 +229,37 @@ static Future<Map<String, dynamic>> loginWithGoogle() async {
   }
 
   throw Exception(
-    '로그인 실패: ${res.statusCode}',
+    '구글 로그인 실패: ${res.statusCode}',
   );
+}
+
+static Future<Map<String, dynamic>> loginWithEmail(String email, String password) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/user/login/email'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'email': email, 'password': password}),
+  );
+
+  if (res.statusCode == 200) {
+    return jsonDecode(res.body);
+  }
+  
+  final error = jsonDecode(res.body);
+  throw Exception(error['detail'] ?? '로그인 실패: ${res.statusCode}');
+}
+
+static Future<Map<String, dynamic>> signUpWithEmail(String email, String password, String nickname) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/user/signup'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'email': email, 'password': password, 'nickname': nickname}),
+  );
+
+  if (res.statusCode == 200) {
+    return jsonDecode(res.body);
+  }
+
+  final error = jsonDecode(res.body);
+  throw Exception(error['detail'] ?? '회원가입 실패: ${res.statusCode}');
 }
 }

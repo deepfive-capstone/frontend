@@ -520,7 +520,7 @@ Widget _buildTopBar() {
                     },
                     child: card.thumbnailUrl.isNotEmpty
                         ? Image.network(
-                            card.thumbnailUrl,
+                            '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(card.thumbnailUrl)}',
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
                                 _thumbPlaceholder(card.category),
@@ -753,7 +753,7 @@ Widget _buildTopBar() {
                 height: 110,
                 child: item.thumbnailUrl.isNotEmpty
                     ? Image.network(
-                        item.thumbnailUrl,
+                        '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(item.thumbnailUrl)}',
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: const Color(0xFFE0E0E0),

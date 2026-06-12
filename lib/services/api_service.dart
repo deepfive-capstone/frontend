@@ -194,7 +194,7 @@ static Future<List<RecommendationData>>
     },
     body: jsonEncode({
       'content_id': contentId,
-      'limit': 10,
+      'limit': 5,
     }),
   );
 

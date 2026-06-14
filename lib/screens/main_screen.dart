@@ -56,10 +56,8 @@ class _MainScreenState extends State<MainScreen>
 
   // 선택된 카테고리에 해당하는 카드만 (skipped 제외 — 이미 읽음 처리된 카드)
   List<VideoCardData> get _filteredCards {
-    final selected = _categories
-        .where((c) => c.isSelected)
-        .map((c) => c.label)
-        .toSet();
+    final selected =
+        _categories.where((c) => c.isSelected).map((c) => c.label).toSet();
     // CardStore에서 직접 읽어 항상 최신 상태 반영
     final storeCards = CardStore.instance.cards;
     return storeCards
@@ -73,32 +71,33 @@ class _MainScreenState extends State<MainScreen>
   List<RecommendationData> _recommendations = [];
   bool _isRecommendationLoading = false;
 
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  CardStore.instance.add(
-    VideoCardData(
-      contentId: 0,
-      videoId: 'Guide',
-      channelName: 'LINK SWIPE!',
-      title: 'LINK SWIPE! 사용 방법',
-      summary:
-          '**🔗 링크를 추가해요.**\n\n'
-          '   아래 + 버튼을 눌러 유튜브 링크를 추가해요.\n\n'
-          '**✨ AI가 요약해 준 카드를 한눈에 확인해요.**\n\n'
-          '   AI가 영상을 분석하고 핵심 내용을 요약해서 카드로 만들어줘요.\n\n'
-          '**❤️ 오른쪽 →**\n\n'
-          '   다시 보고 싶은 영상을 스와이프해요.\n\n'
-          '**❌ ← 왼쪽**\n\n'
-          '   더 이상 보지 않을 영상을 스와이프해요.\n\n',
-      thumbnailUrl: '',
-      category: '기타',
-    ),
-  );
+    CardStore.instance.add(
+      VideoCardData(
+        contentId: 0,
+        videoId: 'Guide',
+        channelName: '',
+        title: 'LINK SWIPE! 사용 방법',
+        summary: '**🔗 링크를 추가해요.**\n\n'
+            '아래 + 버튼을 눌러 유튜브 링크를 추가해요.\n\n'
+            '**✨ AI가 요약해 준 카드를 한눈에 확인해요.**\n\n'
+            'AI가 영상을 분석하고 핵심 내용을 요약해서 카드로 만들어줘요.\n\n'
+            '**❤️ 오른쪽 →**\n\n'
+            '다시 보고 싶은 영상을 스와이프해요.\n\n'
+            '**❌ 왼쪽 ←**\n\n'
+            '더 이상 보지 않을 영상을 스와이프해요.\n\n'
+            '**👆 카드 클릭**\n\n'
+            '카드를 누르면 원본 영상으로 이동해요.\n\n',
+        thumbnailUrl: '',
+        category: '기타',
+      ),
+    );
 
-  _loadFromBackendIfEmpty();
-}
+    _loadFromBackendIfEmpty();
+  }
 
   // CardStore가 비어있을 때만 백엔드에서 초기 로드
   Future<void> _loadFromBackendIfEmpty() async {
@@ -177,37 +176,36 @@ void initState() {
     }
   }
 
-Future<void> _applySwipe(
-  List<VideoCardData> filtered,
-  SwipeState state,
-) async {
-  final safeIndex = _currentIndex.clamp(0, filtered.length - 1);
-  final card = filtered[safeIndex];
+  Future<void> _applySwipe(
+    List<VideoCardData> filtered,
+    SwipeState state,
+  ) async {
+    final safeIndex = _currentIndex.clamp(0, filtered.length - 1);
+    final card = filtered[safeIndex];
 
-  // 로컬 상태 변경
-  CardStore.instance.updateState(card.videoId, state);
+    // 로컬 상태 변경
+    CardStore.instance.updateState(card.videoId, state);
 
-  // 백엔드 상태 변경
-  try {
-    await ApiService.updateStatus(
-      card.contentId,
-      state == SwipeState.liked ? 'liked' : 'skipped',
-    );
-  } catch (e) {
-    debugPrint('PATCH 실패: $e');
+    // 백엔드 상태 변경
+    try {
+      await ApiService.updateStatus(
+        card.contentId,
+        state == SwipeState.liked ? 'liked' : 'skipped',
+      );
+    } catch (e) {
+      debugPrint('PATCH 실패: $e');
+    }
+
+    if (state == SwipeState.liked) {
+      CardStore.instance.moveToEnd(card.videoId);
+    }
+
+    setState(() {
+      _currentIndex = 0;
+      _dragOffset = Offset.zero;
+      _dragAngle = 0;
+    });
   }
-
-  if (state == SwipeState.liked) {
-    CardStore.instance.moveToEnd(card.videoId);
-  }
-
-  setState(() {
-    _currentIndex = 0;
-    _dragOffset = Offset.zero;
-    _dragAngle = 0;
-  });
-}
-
 
   // 버튼으로 스와이프 (REQ-030 / REQ-031)
   void _swipeRight() async {
@@ -246,117 +244,109 @@ Future<void> _applySwipe(
   }
 
   // ── 본문: 로딩 / 에러 / 카드 없음 / 카드 스택 ────────────
-Widget _buildBody() {
-  if (_isLoading) {
-    return const Center(
-      child: CircularProgressIndicator(
-        color: Color(0xFF1A1A1A),
-        strokeWidth: 2,
-      ),
-    );
-  }
-
-  if (_isRecommendationMode) {
-    if (_isRecommendationLoading) {
+  Widget _buildBody() {
+    if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child: CircularProgressIndicator(
+          color: Color(0xFF1A1A1A),
+          strokeWidth: 2,
+        ),
       );
     }
 
-    return _buildRecommendationList();
-  }
+    if (_isRecommendationMode) {
+      if (_isRecommendationLoading) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
 
-  final filtered = _filteredCards;
+      return _buildRecommendationList();
+    }
 
-  if (filtered.isEmpty) {
-    return const Center(
-      child: Text(
-        '카드가 없어요',
-        style: TextStyle(
-          fontSize: 14,
-          color: Color(0xFFAAAAAA),
+    final filtered = _filteredCards;
+
+    if (filtered.isEmpty) {
+      return const Center(
+        child: Text(
+          '카드가 없어요',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFFAAAAAA),
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-return _buildCardStack(filtered);
+    return _buildCardStack(filtered);
   }
 
   // ── 상단바 ────────────────────────────────────────────────
-Widget _buildTopBar() {
-  final filtered = _filteredCards;
+  Widget _buildTopBar() {
+    final filtered = _filteredCards;
 
-  return Padding(
-    padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () => setState(() => _isCategoryOpen = true),
-              child: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 26,
-                color: Color(0xFF444444),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => _isCategoryOpen = true),
+                child: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 26,
+                  color: Color(0xFF444444),
+                ),
               ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 4),
-
-        Row(
-          children: [
-            GestureDetector(
-              onTap: _swipeLeft,
-              child: Icon(
-                Icons.close_rounded,
-                size: 32,
-                color: _closeColor,
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _swipeLeft,
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 32,
+                  color: _closeColor,
+                ),
               ),
-            ),
-
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isRecommendationMode = false;
-                        _currentIndex = 0;
-                      });
-                    },
-                    child: Text(
-                      '내 영상',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: !_isRecommendationMode
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: !_isRecommendationMode
-                            ? const Color(0xFF383838)
-                            : const Color(0xFFBBBBBB),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isRecommendationMode = false;
+                          _currentIndex = 0;
+                        });
+                      },
+                      child: Text(
+                        '내 영상',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: !_isRecommendationMode
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: !_isRecommendationMode
+                              ? const Color(0xFF383838)
+                              : const Color(0xFFBBBBBB),
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  const Text(
-                    '|',
-                    style: TextStyle(
-                      color: Color(0xFFCCCCCC),
-                      fontSize: 15,
+                    const SizedBox(width: 10),
+                    const Text(
+                      '|',
+                      style: TextStyle(
+                        color: Color(0xFFCCCCCC),
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  GestureDetector(
-
-                    onTap: () async {
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () async {
                         final cards = _filteredCards;
 
                         if (cards.isEmpty) return;
@@ -382,35 +372,34 @@ Widget _buildTopBar() {
                       },
                       child: Text(
                         '추천',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: _isRecommendationMode
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: _isRecommendationMode
-                            ? const Color(0xFF383838)
-                            : const Color(0xFFBBBBBB),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: _isRecommendationMode
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: _isRecommendationMode
+                              ? const Color(0xFF383838)
+                              : const Color(0xFFBBBBBB),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-
-            GestureDetector(
-              onTap: _swipeRight,
-              child: Icon(
-                Icons.favorite_border_rounded,
-                size: 32,
-                color: _heartColor,
+              GestureDetector(
+                onTap: _swipeRight,
+                child: Icon(
+                  Icons.favorite_border_rounded,
+                  size: 32,
+                  color: _heartColor,
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── 카드 스택 ─────────────────────────────────────────────
   Widget _buildCardStack(List<VideoCardData> cards) {
@@ -429,8 +418,8 @@ Widget _buildTopBar() {
               bottom: 0,
               child: Transform.scale(
                 scale: 0.95,
-                child: _buildCard(
-                    cards[(safeIndex + 1) % cards.length], isBack: true),
+                child: _buildCard(cards[(safeIndex + 1) % cards.length],
+                    isBack: true),
               ),
             ),
           // 현재 카드
@@ -466,11 +455,11 @@ Widget _buildTopBar() {
         top: 0,
         bottom: 10,
       ),
-
       decoration: BoxDecoration(
         color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color.fromARGB(255, 173, 173, 173), width: 1.5),
+        border: Border.all(
+            color: const Color.fromARGB(255, 173, 173, 173), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color.fromARGB(255, 98, 98, 98).withOpacity(0.08),
@@ -501,54 +490,67 @@ Widget _buildTopBar() {
             ),
 
             // 썸네일
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: GestureDetector(
-                    onTap: () async {
-                      final uri = Uri.parse(
-                        'https://www.youtube.com/watch?v=${card.videoId}',
-                      );
+            card.videoId == 'Guide'
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.parse(
+                              'https://www.youtube.com/watch?v=${card.videoId}',
+                            );
 
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                    },
-                    child: card.thumbnailUrl.isNotEmpty
-                        ? Image.network(
-                            '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(card.thumbnailUrl)}',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _thumbPlaceholder(card.category),
-                          )
-                        : _thumbPlaceholder(card.category),
-                     ),
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          child: card.thumbnailUrl.isNotEmpty
+                              ? Image.network(
+                                  '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(card.thumbnailUrl)}',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _thumbPlaceholder(card.category),
+                                )
+                              : _thumbPlaceholder(card.category),
+                        ),
+                      ),
+                    ),
                   ),
-               ),
-            ),
             // 제목
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-              child: Text(
-                card.title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
-                  height: 1.3,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                card.videoId == 'Guide' ? 5 : 10,
+                16,
+                card.videoId == 'Guide' ? 45 : 4,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  card.title,
+                  textAlign: card.videoId == 'Guide'
+                      ? TextAlign.center
+                      : TextAlign.left,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                    height: 1.6,
+                  ),
                 ),
               ),
             ),
 
             // 요약
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: MarkdownBody(
-                data: card.summary,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: MarkdownBody(
+                  data: card.summary,
                   styleSheet: MarkdownStyleSheet(
                     p: const TextStyle(
                       fontSize: 16,
@@ -556,13 +558,13 @@ Widget _buildTopBar() {
                       height: 1.6,
                     ),
                     h2: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
+                      height: 1.6,
                       fontWeight: FontWeight.w400,
                       color: Color(0xFF1A1A1A),
                     ),
                   ),
-                )
-            ),
+                )),
           ],
         ),
       ),
@@ -615,10 +617,8 @@ Widget _buildTopBar() {
                           GestureDetector(
                             onTap: () =>
                                 setState(() => _isCategoryOpen = false),
-                            child: const Icon(
-                                Icons.keyboard_arrow_up_rounded,
-                                size: 24,
-                                color: Color(0xFF444444)),
+                            child: const Icon(Icons.keyboard_arrow_up_rounded,
+                                size: 24, color: Color(0xFF444444)),
                           ),
                           const SizedBox(height: 6),
                           const Text(
@@ -705,104 +705,101 @@ Widget _buildTopBar() {
       ),
     );
   }
+
   Widget _buildRecommendationList() {
-  if (_recommendations.isEmpty) {
-    return const Center(
-      child: Text(
-        '추천 영상이 없습니다',
-        style: TextStyle(
-          color: Color(0xFFAAAAAA),
-        ),
-      ),
-    );
-  }
-
-  return ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: _recommendations.length,
-    itemBuilder: (context, index) {
-      final item = _recommendations[index];
-
-      return GestureDetector(
-        onTap: () async {
-           final uri = Uri.parse(item.youtubeUrl);
-
-          await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-           );
-            },
-  child: Container(
-    height: 110,
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFE8E8E8),
+    if (_recommendations.isEmpty) {
+      return const Center(
+        child: Text(
+          '추천 영상이 없습니다',
+          style: TextStyle(
+            color: Color(0xFFAAAAAA),
           ),
         ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(12),
-              ),
-              child: SizedBox(
-                width: 140,
-                height: 110,
-                child: item.thumbnailUrl.isNotEmpty
-                    ? Image.network(
-                        '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(item.thumbnailUrl)}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFE0E0E0),
-                        ),
-                      )
-                    : Container(
-                        color: const Color(0xFFE0E0E0),
-                      ),
-              ),
-            ),
+      );
+    }
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _recommendations.length,
+      itemBuilder: (context, index) {
+        final item = _recommendations[index];
 
-                    const SizedBox(height: 6),
+        return GestureDetector(
+            onTap: () async {
+              final uri = Uri.parse(item.youtubeUrl);
 
-                    Text(
-                      item.channel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF888888),
-                      ),
-                    ),
-                  ],
+              await launchUrl(
+                uri,
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            child: Container(
+              height: 110,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE8E8E8),
                 ),
               ),
-            ),
-          ],
-        ),
-      )
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(12),
+                    ),
+                    child: SizedBox(
+                      width: 140,
+                      height: 110,
+                      child: item.thumbnailUrl.isNotEmpty
+                          ? Image.network(
+                              '${ApiService.baseUrl}/proxy/image?url=${Uri.encodeComponent(item.thumbnailUrl)}',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFE0E0E0),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFFE0E0E0),
+                            ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            item.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            item.channel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ));
+      },
     );
-    },
-  );
-}
+  }
 }

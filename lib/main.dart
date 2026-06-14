@@ -57,7 +57,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _tab = 0;
+  int _tab = 2;
   int _storageRefreshKey = 0;
   int _mainRefreshKey = 0;
 

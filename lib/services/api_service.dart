@@ -27,14 +27,14 @@ class VideoCardData {
   // POST /contents 응답 파싱
   factory VideoCardData.fromJson(Map<String, dynamic> json) {
     return VideoCardData(
-      contentId:    json['content_id'] ?? 0,
-      videoId:      json['video_id']?.toString() ?? '',
-      channelName:  json['channel'] ?? '',
-      title:        json['title'] ?? '',
-      summary:      json['summary'] ?? '',
+      contentId: json['content_id'] ?? 0,
+      videoId: json['video_id']?.toString() ?? '',
+      channelName: json['channel'] ?? '',
+      title: json['title'] ?? '',
+      summary: json['summary'] ?? '',
       thumbnailUrl: json['thumbnail'] ?? json['thumbnail_url'] ?? '',
-      category:     json['category'] ?? '기타',
-      status:       json['status'] ?? 'analyze',
+      category: json['category'] ?? '기타',
+      status: json['status'] ?? 'analyze',
     );
   }
 }
@@ -72,63 +72,63 @@ class ApiService {
   static const String baseUrl = 'http://127.0.0.1:8000';
 
   static Future<void> logout() async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/user/logout'),
-    headers: {
-      'Authorization':
-          'Bearer ${UserData.accessToken}',
-    },
-  );
+    final res = await http.post(
+      Uri.parse('$baseUrl/user/logout'),
+      headers: {
+        'Authorization': 'Bearer ${UserData.accessToken}',
+      },
+    );
 
-  if (res.statusCode != 200) {
-    throw Exception('로그아웃 실패');
+    if (res.statusCode != 200) {
+      throw Exception('로그아웃 실패');
+    }
   }
-}
 
-static Future<void> deleteAccount() async {
-  final res = await http.delete(
-    Uri.parse('$baseUrl/user/me'),
-    headers: {
-      'Authorization':
-          'Bearer ${UserData.accessToken}',
-    },
-  );
+  static Future<void> deleteAccount() async {
+    final res = await http.delete(
+      Uri.parse('$baseUrl/user/me'),
+      headers: {
+        'Authorization': 'Bearer ${UserData.accessToken}',
+      },
+    );
 
-  if (res.statusCode != 200) {
-    throw Exception('회원탈퇴 실패');
+    if (res.statusCode != 200) {
+      throw Exception('회원탈퇴 실패');
+    }
   }
-}
 
   static Future<Map<String, dynamic>> updateNickname(
-  String nickname,
-) async {
-  final res = await http.patch(
-    Uri.parse('$baseUrl/user/nickname'),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization':
-          'Bearer ${UserData.accessToken}',
-    },
-    body: jsonEncode({
-      'nickname': nickname,
-    }),
-  );
+    String nickname,
+  ) async {
+    final res = await http.patch(
+      Uri.parse('$baseUrl/user/nickname'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${UserData.accessToken}',
+      },
+      body: jsonEncode({
+        'nickname': nickname,
+      }),
+    );
 
-  if (res.statusCode == 200) {
-    return jsonDecode(res.body);
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+
+    throw Exception(
+      '닉네임 변경 실패: ${res.statusCode}',
+    );
   }
 
-  throw Exception(
-    '닉네임 변경 실패: ${res.statusCode}',
-  );
-}
-
-  // GET /contents — URL 분석 요청 → 카드 생성
+  // POST/contents — URL 분석 요청 → 카드 생성
   static Future<VideoCardData> analyzeVideo(String youtubeUrl) async {
     final res = await http
         .post(
           Uri.parse('$baseUrl/contents'),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${UserData.accessToken}',
+          },
           body: jsonEncode({'url': youtubeUrl}),
         )
         .timeout(const Duration(seconds: 50000));
@@ -139,20 +139,22 @@ static Future<void> deleteAccount() async {
       if (body['error'] != null) throw Exception(body['error']);
       return VideoCardData.fromJson(body);
     }
-    throw Exception('서버 오류 ${res.statusCode}: ${res.body}',);
+    throw Exception(
+      '서버 오류 ${res.statusCode}: ${res.body}',
+    );
   }
 
   // GET /contents — 카드 목록 조회 (카테고리 필터 선택)
-  static Future<List<VideoCardData>> getContents({List<String>? categories}) async {
+  static Future<List<VideoCardData>> getContents(
+      {List<String>? categories}) async {
     String url = '$baseUrl/contents';
     if (categories != null && categories.isNotEmpty) {
       final params = categories.map((c) => 'category=$c').join('&');
       url += '?$params';
     }
 
-    final res = await http
-        .get(Uri.parse(url))
-        .timeout(const Duration(seconds: 1000));
+    final res =
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 1000));
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);
@@ -180,86 +182,89 @@ static Future<void> deleteAccount() async {
         .delete(
           Uri.parse('$baseUrl/contents/$contentId'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'content_ids': [contentId]}),
+          body: jsonEncode({
+            'content_ids': [contentId]
+          }),
         )
         .timeout(const Duration(seconds: 10));
   }
-static Future<List<RecommendationData>>
-    getRecommendations(int contentId) async {
 
-  final res = await http.post(
-    Uri.parse('$baseUrl/recommend'),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: jsonEncode({
-      'content_id': contentId,
-      'limit': 5,
-    }),
-  );
+  static Future<List<RecommendationData>> getRecommendations(
+      int contentId) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/recommend'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'content_id': contentId,
+        'limit': 5,
+      }),
+    );
 
-  if (res.statusCode == 200) {
-    final data = jsonDecode(res.body);
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
 
-    final List items =
-        data['recommendations'] ?? [];
+      final List items = data['recommendations'] ?? [];
 
-    return items
-        .map((e) => RecommendationData.fromJson(e))
-        .toList();
+      return items.map((e) => RecommendationData.fromJson(e)).toList();
+    }
+
+    throw Exception(
+      '추천 조회 실패: ${res.statusCode} ${res.body}',
+    );
   }
 
-  throw Exception(
-    '추천 조회 실패: ${res.statusCode} ${res.body}',
-  );
-}
-static Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/user/login/google'),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: jsonEncode({
-      'id_token': idToken,
-    }),
-  );
+  static Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/user/login/google'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'id_token': idToken,
+      }),
+    );
 
-  if (res.statusCode == 200) {
-    return jsonDecode(res.body);
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+
+    throw Exception(
+      '구글 로그인 실패: ${res.statusCode}',
+    );
   }
 
-  throw Exception(
-    '구글 로그인 실패: ${res.statusCode}',
-  );
-}
+  static Future<Map<String, dynamic>> loginWithEmail(
+      String email, String password) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/user/login/email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
 
-static Future<Map<String, dynamic>> loginWithEmail(String email, String password) async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/user/login/email'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'email': email, 'password': password}),
-  );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
 
-  if (res.statusCode == 200) {
-    return jsonDecode(res.body);
-  }
-  
-  final error = jsonDecode(res.body);
-  throw Exception(error['detail'] ?? '로그인 실패: ${res.statusCode}');
-}
-
-static Future<Map<String, dynamic>> signUpWithEmail(String email, String password, String nickname) async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/user/signup'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'email': email, 'password': password, 'nickname': nickname}),
-  );
-
-  if (res.statusCode == 200) {
-    return jsonDecode(res.body);
+    final error = jsonDecode(res.body);
+    throw Exception(error['detail'] ?? '로그인 실패: ${res.statusCode}');
   }
 
-  final error = jsonDecode(res.body);
-  throw Exception(error['detail'] ?? '회원가입 실패: ${res.statusCode}');
-}
+  static Future<Map<String, dynamic>> signUpWithEmail(
+      String email, String password, String nickname) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/user/signup'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(
+          {'email': email, 'password': password, 'nickname': nickname}),
+    );
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+
+    final error = jsonDecode(res.body);
+    throw Exception(error['detail'] ?? '회원가입 실패: ${res.statusCode}');
+  }
 }
